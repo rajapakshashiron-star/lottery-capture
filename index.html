@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="si">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#1a73e8">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%231a73e8' width='192' height='192'/><text x='50%' y='50%' font-size='120' fill='white' text-anchor='middle' dy='.3em'>🎯</text></svg>">
+  <title>Lottery Capture — OCR (සිංහල)</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,"Noto Sans Sinhala",sans-serif;margin:18px;background:#fff;color:#111}
+    .wrap{max-width:860px;margin:0 auto}
+    h1{font-size:1.2rem;margin:0 0 8px}
+    h2{font-size:1rem;margin:0 0 8px}
+    label{display:block;margin-top:12px;font-weight:600}
+    textarea,input[type="text"],input[type="file"]{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:1rem}
+    .row{margin-top:8px}
+    button{margin-top:8px;padding:10px 12px;border-radius:8px;border:0;background:#1a73e8;color:#fff;cursor:pointer;font-size:0.95rem}
+    button.secondary{background:#efefef;color:#111;margin-left:8px}
+    button:disabled{opacity:0.5;cursor:not-allowed}
+    #out{white-space:pre-wrap;border:1px solid #eee;padding:12px;border-radius:8px;margin-top:12px;min-height:120px;background:#fafafa;font-family:monospace;font-size:0.9rem}
+    .small{color:#666;font-size:0.9rem;margin-top:6px}
+    .flex{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    
+    /* Camera styles */
+    #cameraSection{border:1px solid #ddd;padding:12px;border-radius:8px;margin-top:12px;background:#f9f9f9}
+    #video{width:100%;max-width:500px;border-radius:8px;margin-top:8px;background:#000;display:none}
+    #canvas{display:none}
+    .camera-controls{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+    .status{padding:8px;border-radius:4px;margin-top:8px;font-size:0.9rem}
+    .status.loading{background:#e3f2fd;color:#1976d2}
+    .status.error{background:#ffebee;color:#c62828}
+    .status.success{background:#e8f5e9;color:#2e7d32}
+    #photoPreview{max-width:500px;width:100%;border-radius:8px;display:none;border:1px solid #ddd;margin-top:8px}
+    #ocrText{display:none}
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <h1>🎯 Lottery Capture — Master List සමග Match කරන්න (OCR සහිත)</h1>
+
+    <label>1) Master list (paste or upload .txt/.csv)</label>
+    <textarea id="master" rows="5" placeholder="උදා: 3,24,39,45 12 07 99 ..."></textarea>
+    <div class="row">
+      <input id="masterFile" type="file" accept=".txt,.csv,text/plain" />
+      <div class="small">Upload කරනවා නම් plain text/CSV (numbers) ගොනුවක්.</div>
+    </div>
+
+    <!-- Camera Section -->
+    <div id="cameraSection">
+      <h2 style="margin-top:0">📷 ෆොටෝ කැප්චර (ලොතරැයි පත්‍රය ගන්න)</h2>
+      
+      <div class="flex">
+        <button id="startCamera">📱 ක්‍යාමරා සක්‍රිය කරන්න</button>
+        <button id="stopCamera" class="secondary" disabled>🛑 ක්‍යාමරා පිටතට ගන්න</button>
+      </div>
+
+      <video id="video"></video>
+      
+      <div class="flex" id="captureControls" style="display:none;margin-top:8px">
+        <button id="takePhoto">📸 ෆොටෝ එක ගන්න</button>
+        <button id="toggleMirror" class="secondary">🔄 Flip</button>
+      </div>
+
+      <canvas id="canvas"></canvas>
+
+      <div id="capturedImage">
+        <img id="photoPreview"/>
+      </div>
+
+      <div class="flex" id="ocrControls" style="display:none;margin-top:8px">
+        <button id="extractText">🔍 OCR - අකුරු කියවන්න</button>
+        <button id="clearPhoto" class="secondary">🗑️ Clear</button>
+      </div>
+
+      <div id="status"></div>
+      <textarea id="ocrText" rows="4" placeholder="OCR විසින් කියවන අකුරු මෙතනට පෙන්වෙයි..."></textarea>
+    </div>
+
+    <!-- Manual Input Section -->
+    <label>2) හෝ ඩිජිටල් සංඛ්‍යා ටයිප් කරන්න</label>
+    <input id="nums" type="text" placeholder="උදා: 3 24 39 45" />
+    <div class="flex">
+      <button id="capture">✅ Capture Matches</button>
+      <button id="clear" class="secondary">🗑️ Clear</button>
+    </div>
+
+    <div id="out">Results will appear here.</div>
+
+    <div class="flex" style="margin-top:12px">
+      <button id="copy" class="secondary">📋 Copy Matches</button>
+      <button id="download" class="secondary">💾 Download Matches (.txt)</button>
+    </div>
+
+    <div class="small" style="margin-top:12px">
+      <strong>Notes:</strong> Camera සහ OCR සක්‍රිය කරන්න. ෆොටෝ ගිය පසු "OCR - අකුරු කියවන්න" click කරන්න. ලොතරැයි පත්‍රයේ ඩිජිටල් සංඛ්‍යා කියවන්න.
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5"></script>
+  <script>
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+    }
+
+    const masterEl = document.getElementById('master');
+    const masterFileEl = document.getElementById('masterFile');
+    const numsEl = document.getElementById('nums');
+    const out = document.getElementById('out');
+    const captureBtn = document.getElementById('capture');
+    const clearBtn = document.getElementById('clear');
+    const copyBtn = document.getElementById('copy');
+    const downloadBtn = document.getElementById('download');
+
+    // Camera elements
+    const startCameraBtn = document.getElementById('startCamera');
+    const stopCameraBtn = document.getElementById('stopCamera');
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const takePhotoBtn = document.getElementById('takePhoto');
+    const toggleMirrorBtn = document.getElementById('toggleMirror');
+    const photoPreview = document.getElementById('photoPreview');
+    const extractTextBtn = document.getElementById('extractText');
+    const clearPhotoBtn = document.getElementById('clearPhoto');
+    const ocrText = document.getElementById('ocrText');
+    const status = document.getElementById('status');
+    const captureControls = document.getElementById('captureControls');
+    const ocrControls = document.getElementById('ocrControls');
+
+    let stream = null;
+    let isMirrored = true;
+
+    // parse numbers
+    function parseNumbersFromText(text, preserveLeadingZeros=false) {
+      if (!text) return [];
+      const re = /\b0*\d{1,3}\b/g;
+      const arr = Array.from(text.matchAll(re)).map(m => {
+        const s = m[0];
+        return preserveLeadingZeros ? s : String(parseInt(s,10));
+      }).filter(Boolean);
+      return arr;
+    }
+
+    // Status message
+    function showStatus(msg, type='loading') {
+      status.textContent = msg;
+      status.className = `status ${type}`;
+    }
+
+    function clearStatus() {
+      status.textContent = '';
+      status.className = '';
+    }
+
+    // Load master file
+    masterFileEl.addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      try {
+        const txt = await f.text();
+        masterEl.value = txt;
+        showStatus(`Master list loaded (${f.name})`, 'success');
+        setTimeout(clearStatus, 2000);
+      } catch(err) {
+        showStatus('File එක කියවන්න අපොතු වුණා: ' + (err && err.message ? err.message : String(err)), 'error');
+      }
+    });
+
+    // Camera - Start
+    startCameraBtn.addEventListener('click', async () => {
+      try {
+        showStatus('ක්‍යාමරා ගතක්කරන්න...');
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        video.srcObject = stream;
+        video.style.display = 'block';
+        video.play();
+        
+        startCameraBtn.disabled = true;
+        stopCameraBtn.disabled = false;
+        captureControls.style.display = 'flex';
+        
+        showStatus('ක්‍යාමරා සක්‍රිය', 'success');
+        setTimeout(clearStatus, 2000);
+      } catch(err) {
+        showStatus('Camera permission ඔබ දෙන්න ඕනේ: ' + (err && err.message ? err.message : String(err)), 'error');
+      }
+    });
+
+    // Camera - Stop
+    stopCameraBtn.addEventListener('click', () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      video.style.display = 'none';
+      video.srcObject = null;
+      captureControls.style.display = 'none';
+      
+      startCameraBtn.disabled = false;
+      stopCameraBtn.disabled = true;
+      
+      showStatus('ක්‍යාමරා වසා දැමුණි', 'success');
+      setTimeout(clearStatus, 2000);
+    });
+
+    // Take Photo
+    takePhotoBtn.addEventListener('click', () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      if (isMirrored) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      
+      ctx.drawImage(video, 0, 0);
+      
+      if (isMirrored) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      
+      const imageData = canvas.toDataURL('image/jpeg');
+      photoPreview.src = imageData;
+      photoPreview.style.display = 'block';
+      
+      ocrControls.style.display = 'flex';
+      showStatus('ෆොටෝ ගත්තා! "OCR" click කරන්න', 'success');
+      setTimeout(clearStatus, 2000);
+    });
+
+    // Toggle Mirror
+    toggleMirrorBtn.addEventListener('click', () => {
+      isMirrored = !isMirrored;
+      video.style.transform = isMirrored ? 'scaleX(-1)' : 'scaleX(1)';
+      showStatus(isMirrored ? 'Mirror ON' : 'Mirror OFF', 'success');
+      setTimeout(clearStatus, 1500);
+    });
+
+    // Clear Photo
+    clearPhotoBtn.addEventListener('click', () => {
+      photoPreview.style.display = 'none';
+      ocrText.style.display = 'none';
+      ocrText.value = '';
+      numsEl.value = '';
+      ocrControls.style.display = 'none';
+      clearStatus();
+    });
+
+    // Extract Text with OCR
+    extractTextBtn.addEventListener('click', async () => {
+      if (!photoPreview.src) {
+        showStatus('ෆොටෝ එක ගන්න පලමුව', 'error');
+        return;
+      }
+
+      showStatus('OCR ක්‍රියාවලිය... (මිනිත්තු 1-2 අපේක්ෂා කරන්න) ⏳', 'loading');
+      extractTextBtn.disabled = true;
+
+      try {
+        const result = await Tesseract.recognize(
+          photoPreview.src,
+          'eng',
+          { logger: (m) => {
+            if (m.status === 'recognizing') {
+              const progress = Math.round(m.progress * 100);
+              showStatus(`OCR ක්‍රියාවලිය... ${progress}%`, 'loading');
+            }
+          }}
+        );
+
+        const extractedText = result.data.text;
+        ocrText.value = extractedText;
+        ocrText.style.display = 'block';
+        
+        // Auto-fill input field
+        numsEl.value = extractedText;
+        
+        showStatus(`ඉටු! ඩිජිට්: ${extractedText.split(/\s+/).length} දැක්කා`, 'success');
+        setTimeout(clearStatus, 2000);
+      } catch(err) {
+        showStatus('OCR අසාර්ථක: ' + (err && err.message ? err.message : String(err)), 'error');
+        console.error(err);
+      } finally {
+        extractTextBtn.disabled = false;
+      }
+    });
+
+    // Capture Matches
+    captureBtn.addEventListener('click', () => {
+      const masterRaw = masterEl.value || '';
+      const inputRaw = numsEl.value || '';
+      const master = parseNumbersFromText(masterRaw);
+      if (master.length === 0) { 
+        showStatus('Master list එකේ numbers නැත. Paste හෝ upload කරන්න.', 'error');
+        return; 
+      }
+      const input = parseNumbersFromText(inputRaw);
+      if (input.length === 0) { 
+        showStatus('Input field එකේ numbers නැත.', 'error');
+        return; 
+      }
+
+      const masterSet = new Set(master.map(x => String(parseInt(x,10))));
+      const inputNorm = input.map(x => String(parseInt(x,10)));
+      const matched = Array.from(new Set(inputNorm.filter(x => masterSet.has(x)))).sort((a,b)=>+a-+b);
+      const notMatched = Array.from(new Set(inputNorm.filter(x => !masterSet.has(x)))).sort((a,b)=>+a-+b);
+
+      const report = [
+        `Master total: ${master.length}`,
+        `Input total: ${input.length}`,
+        '',
+        `✅ Captured matches: ${matched.length}`,
+        matched.length ? matched.join(' ') : '[no matches]',
+        '',
+        `❌ Input NOT in master: ${notMatched.length}`,
+        notMatched.length ? notMatched.join(' ') : '[all input numbers found in master]'
+      ].join('\n');
+
+      out.textContent = report;
+      out.dataset.lastMatches = matched.join(' ');
+      showStatus('Match ගැටෙන්නා!', 'success');
+      setTimeout(clearStatus, 2000);
+    });
+
+    // Clear
+    clearBtn.addEventListener('click', () => {
+      masterEl.value = '';
+      numsEl.value = '';
+      masterFileEl.value = '';
+      ocrText.value = '';
+      photoPreview.style.display = 'none';
+      out.textContent = 'Results will appear here.';
+      clearStatus();
+    });
+
+    // Copy
+    copyBtn.addEventListener('click', () => {
+      const text = out.dataset.lastMatches || out.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        showStatus('Copied! 📋', 'success');
+        setTimeout(clearStatus, 1500);
+      }).catch(() => {
+        showStatus('Copy අසාර්ථක', 'error');
+      });
+    });
+
+    // Download
+    downloadBtn.addEventListener('click', () => {
+      const text = out.textContent;
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'lottery_matches.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
