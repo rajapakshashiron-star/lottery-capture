@@ -97,7 +97,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5"></script>
+  <script async src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
     // Register Service Worker
     if ('serviceWorker' in navigator) {
@@ -258,19 +258,33 @@
         return;
       }
 
-      showStatus('OCR ක්‍රියාවලිය... (මිනිත්තු 1-2 අපේක්ෂා කරන්න) ⏳', 'loading');
+      showStatus('OCR processing... (මිනිත්තු 1-2 අපේක්ෂා කරන්න) ⏳', 'loading');
       extractTextBtn.disabled = true;
 
       try {
-        const result = await Tesseract.recognize(
+        // Wait for Tesseract to be available
+        let attempts = 0;
+        while (!window.Tesseract && attempts < 50) {
+          await new Promise(r => setTimeout(r, 100));
+          attempts++;
+        }
+
+        if (!window.Tesseract) {
+          throw new Error('Tesseract.js failed to load');
+        }
+
+        const { recognize } = window.Tesseract;
+        const result = await recognize(
           photoPreview.src,
           'eng',
-          { logger: (m) => {
-            if (m.status === 'recognizing') {
-              const progress = Math.round(m.progress * 100);
-              showStatus(`OCR ක්‍රියාවලිය... ${progress}%`, 'loading');
+          { 
+            logger: (m) => {
+              if (m.status === 'recognizing') {
+                const progress = Math.round(m.progress * 100);
+                showStatus(`OCR ක්‍රියාවලිය... ${progress}%`, 'loading');
+              }
             }
-          }}
+          }
         );
 
         const extractedText = result.data.text;
